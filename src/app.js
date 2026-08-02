@@ -318,6 +318,8 @@ function filterExpensesByCategory(category) {
 }
 
 function clearExpenseFilter() {
+  document.getElementById('expenseCategoryFilter').value = '';
+  document.getElementById('expenseSearchInput').value = '';
   renderExpenseList('expenseList', state.expenses);
 }
 
@@ -409,7 +411,7 @@ function drawBars(canvasId, labels, values, colors) {
   const ctx = canvas.getContext('2d');
   const max = Math.max(...values, 1);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '22px system-ui';
+  ctx.font = '22px system-us';
   ctx.textBaseline = 'middle';
   values.forEach((value, i) => {
     const x = 45 + i * (canvas.width - 90) / values.length;
@@ -498,22 +500,28 @@ document.getElementById('cancelSalaryBtn').onclick = () => {
 };
 
 // Expense Search
-document.getElementById('expenseSearchInput')?.addEventListener('input', (e) => {
-  if (e.target.value.trim()) {
-    searchExpenses(e.target.value);
-  } else {
-    clearExpenseFilter();
-  }
-});
+const expenseSearchInput = document.getElementById('expenseSearchInput');
+if (expenseSearchInput) {
+  expenseSearchInput.addEventListener('input', (e) => {
+    if (e.target.value.trim()) {
+      searchExpenses(e.target.value);
+    } else {
+      clearExpenseFilter();
+    }
+  });
+}
 
 // Expense Category Filter
-document.getElementById('expenseCategoryFilter')?.addEventListener('change', (e) => {
-  if (e.target.value) {
-    filterExpensesByCategory(e.target.value);
-  } else {
-    clearExpenseFilter();
-  }
-});
+const expenseCategoryFilter = document.getElementById('expenseCategoryFilter');
+if (expenseCategoryFilter) {
+  expenseCategoryFilter.addEventListener('change', (e) => {
+    if (e.target.value) {
+      filterExpensesByCategory(e.target.value);
+    } else {
+      clearExpenseFilter();
+    }
+  });
+}
 
 // General Controls
 document.querySelectorAll('input[type=date]').forEach(input => { input.value = today(); });
