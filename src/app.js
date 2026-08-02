@@ -4,6 +4,22 @@ const today = () => new Date().toISOString().slice(0, 10);
 const monthKey = (date = today()) => date.slice(0, 7);
 const uid = () => crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`;
 
+const EXPENSE_CATEGORIES = [
+  'Grocery',
+  'Vegetables',
+  'Milk',
+  'Shopping',
+  'Petrol',
+  'Food',
+  'Medicine',
+  'Mobile Recharge',
+  'Internet',
+  'Travel',
+  'House Rent',
+  'Entertainment',
+  'Other'
+];
+
 const defaults = {
   theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
   salary: { amount: 38000 },
@@ -16,7 +32,7 @@ const defaults = {
 
 let state = loadState();
 
-// Migration: Convert old incomes structure to new one
+// Migration: Convert old expenses structure to new one
 function migrateState(saved) {
   if (!saved) return structuredClone(defaults);
   
@@ -26,10 +42,8 @@ function migrateState(saved) {
   if (parsed.incomes && Array.isArray(parsed.incomes)) {
     parsed.incomes.forEach(income => {
       if (income.source === 'Salary Income') {
-        // Extract salary amount and remove from incomes
         parsed.salary = { amount: income.amount };
       } else {
-        // Move other incomes to businessIncomes (preserve data)
         if (!parsed.businessIncomes) parsed.businessIncomes = [];
         parsed.businessIncomes.push({
           id: income.id,
@@ -40,8 +54,15 @@ function migrateState(saved) {
         });
       }
     });
-    // Remove old incomes array
     delete parsed.incomes;
+  }
+  
+  // Migrate old expenses to new format (add notes field if missing)
+  if (parsed.expenses && Array.isArray(parsed.expenses)) {
+    parsed.expenses = parsed.expenses.map(expense => ({
+      ...expense,
+      notes: expense.notes || ''
+    }));
   }
   
   // Ensure all new properties exist
@@ -66,6 +87,15 @@ function saveState() { localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 const sum = items => items.reduce((total, item) => total + Number(item.amount || 0), 0);
 const byMonth = items => items.filter(item => monthKey(item.date || item.dueDate) === monthKey());
 const electricityTotal = () => Number(state.electricity.daily || 0) * Number(state.electricity.days || 0);
+
+function getCategoryWiseExpenses() {
+  const thisMonth = byMonth(state.expenses);
+  const categoryMap = thisMonth.reduce((acc, exp) => {
+    acc[exp.category] = (acc[exp.category] || 0) + Number(exp.amount);
+    return acc;
+  }, {});
+  return categoryMap;
+}
 
 function totals() {
   const salaryIncome = Number(state.salary?.amount || 0);
@@ -121,7 +151,11 @@ function render() {
   document.getElementById('dailyElectricityInput').value = state.electricity.daily;
   document.getElementById('electricityDays').value = state.electricity.days;
   
-  renderList('expenseList', state.expenses, item => item.category, item => item.date, 'expenses');
+  // Render Expenses Module
+  setText('expenseMonthTotal', currency.format(t.expenseTotal));
+  renderExpenseList('expenseList', state.expenses);
+  renderCategoryWiseTotals();
+  
   renderList('emiList', state.emis, item => `${item.name} ${item.paid ? '• Paid' : '• Due'}`, item => item.dueDate, 'emis', true);
   
   renderSummary(t); 
@@ -163,7 +197,7 @@ function openEditIncomeForm(item, collection) {
   const formEl = document.getElementById(form);
   
   // Populate form with existing data
-  formEl.elements[0].value = item.description || item.source; // description/source
+  formEl.elements[0].value = item.description || item.source;
   formEl.elements[1].value = item.amount;
   formEl.elements[2].value = item.date;
   formEl.elements[3].value = item.notes || '';
@@ -194,6 +228,125 @@ function openEditIncomeForm(item, collection) {
     formEl.onsubmit = originalOnSubmit;
     render();
   };
+}
+
+function renderExpenseList(id, items, filterCategory = null) {
+  const el = document.getElementById(id);
+  let filtered = items;
+  
+  if (filterCategory) {
+    filtered = items.filter(item => item.category === filterCategory);
+  }
+  
+  filtered = byMonth(filtered);
+  
+  el.innerHTML = filtered.length ? '' : '<article class="list-item glass-card"><div>No entries yet</div></article>';
+  filtered.slice().reverse().forEach(item => {
+    const row = document.createElement('article');
+    row.className = 'list-item glass-card';
+    const noteText = item.notes ? `<br><small class="note">${item.notes}</small>` : '';
+    row.innerHTML = `<div><strong>${item.category}</strong><br><small>${item.date} • ${currency.format(item.amount)}</small>${noteText}</div><div class="item-actions"><button class="icon-button" data-edit data-id="${item.id}">✎</button><button class="icon-button" data-delete data-id="${item.id}">🗑</button></div>`;
+    
+    row.querySelector('[data-delete]').onclick = () => { 
+      state.expenses = state.expenses.filter(entry => entry.id !== item.id); 
+      render(); 
+    };
+    
+    row.querySelector('[data-edit]').onclick = () => {
+      openEditExpenseForm(item);
+    };
+    
+    el.appendChild(row);
+  });
+}
+
+function openEditExpenseForm(item) {
+  const formEl = document.getElementById('expenseForm');
+  
+  // Populate form with existing data
+  formEl.elements[0].value = item.category;
+  formEl.elements[1].value = item.amount;
+  formEl.elements[2].value = item.date;
+  formEl.elements[3].value = item.notes || '';
+  
+  // Change button text and handler
+  const submitBtn = formEl.querySelector('button[type="submit"]');
+  const originalText = submitBtn.textContent;
+  const originalOnSubmit = formEl.onsubmit;
+  
+  submitBtn.textContent = 'Update Expense';
+  
+  formEl.onsubmit = (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(formEl));
+    const index = state.expenses.findIndex(e => e.id === item.id);
+    if (index >= 0) {
+      state.expenses[index] = {
+        id: item.id,
+        category: data.category,
+        amount: Number(data.amount),
+        date: data.date,
+        notes: data.notes || ''
+      };
+    }
+    formEl.reset();
+    submitBtn.textContent = originalText;
+    formEl.onsubmit = originalOnSubmit;
+    render();
+  };
+}
+
+function renderCategoryWiseTotals() {
+  const categoryMap = getCategoryWiseExpenses();
+  const container = document.getElementById('expenseCategoryTotals');
+  if (!container) return;
+  
+  if (Object.keys(categoryMap).length === 0) {
+    container.innerHTML = '<div class="list-item glass-card"><div>No expenses yet</div></div>';
+    return;
+  }
+  
+  container.innerHTML = Object.entries(categoryMap)
+    .sort((a, b) => b[1] - a[1])
+    .map(([cat, total]) => `<article class="category-total glass-card"><div><strong>${cat}</strong></div><strong>${currency.format(total)}</strong></article>`)
+    .join('');
+}
+
+function filterExpensesByCategory(category) {
+  const el = document.getElementById('expenseList');
+  renderExpenseList('expenseList', state.expenses, category);
+}
+
+function clearExpenseFilter() {
+  renderExpenseList('expenseList', state.expenses);
+}
+
+function searchExpenses(query) {
+  const el = document.getElementById('expenseList');
+  const lowerQuery = query.toLowerCase();
+  const filtered = byMonth(state.expenses.filter(exp => 
+    exp.category.toLowerCase().includes(lowerQuery) || 
+    (exp.notes && exp.notes.toLowerCase().includes(lowerQuery))
+  ));
+  
+  el.innerHTML = filtered.length ? '' : '<article class="list-item glass-card"><div>No matching expenses</div></article>';
+  filtered.slice().reverse().forEach(item => {
+    const row = document.createElement('article');
+    row.className = 'list-item glass-card';
+    const noteText = item.notes ? `<br><small class="note">${item.notes}</small>` : '';
+    row.innerHTML = `<div><strong>${item.category}</strong><br><small>${item.date} • ${currency.format(item.amount)}</small>${noteText}</div><div class="item-actions"><button class="icon-button" data-edit data-id="${item.id}">✎</button><button class="icon-button" data-delete data-id="${item.id}">🗑</button></div>`;
+    
+    row.querySelector('[data-delete]').onclick = () => { 
+      state.expenses = state.expenses.filter(entry => entry.id !== item.id); 
+      render(); 
+    };
+    
+    row.querySelector('[data-edit]').onclick = () => {
+      openEditExpenseForm(item);
+    };
+    
+    el.appendChild(row);
+  });
 }
 
 function renderList(id, items, title, subtitle, collection, canToggle = false) {
@@ -233,17 +386,21 @@ function renderSummary(t) {
 function renderReports(t) {
   const savingsRate = t.totalIncome ? Math.round((t.savings / t.totalIncome) * 100) : 0;
   const topCategory = largestCategory();
+  const categoryMap = getCategoryWiseExpenses();
+  const topCategoryAmount = categoryMap[topCategory] || 0;
+  
   document.getElementById('reportText').innerHTML = `
     <article class="metric glass-card"><span>Savings Rate</span><strong>${savingsRate}%</strong></article>
     <article class="metric glass-card"><span>Top Expense Category</span><strong>${topCategory}</strong></article>
+    <article class="metric glass-card"><span>Top Category Amount</span><strong>${currency.format(topCategoryAmount)}</strong></article>
     <article class="metric glass-card"><span>Monthly Salary</span><strong>${currency.format(t.salaryIncome)}</strong></article>
     <article class="metric glass-card"><span>Variable Income</span><strong>${currency.format(t.businessIncome + t.otherIncome)}</strong></article>
   `;
 }
 
 function largestCategory() {
-  const map = state.expenses.reduce((acc, exp) => ({ ...acc, [exp.category]: (acc[exp.category] || 0) + Number(exp.amount) }), {});
-  return Object.entries(map).sort((a, b) => b[1] - a[1])[0]?.[0] || 'None';
+  const categoryMap = getCategoryWiseExpenses();
+  return Object.entries(categoryMap).sort((a, b) => b[1] - a[1])[0]?.[0] || 'None';
 }
 
 function drawBars(canvasId, labels, values, colors) {
@@ -273,7 +430,8 @@ function drawFinanceChart(t) {
 }
 
 function drawCategoryChart() { 
-  const data = Object.entries(state.expenses.reduce((a, e) => ({ ...a, [e.category]: (a[e.category] || 0) + Number(e.amount) }), {})).slice(0, 5);
+  const categoryMap = getCategoryWiseExpenses();
+  const data = Object.entries(categoryMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
   if (data.length) {
     const labels = data.map(d => d[0]);
     const values = data.map(d => d[1]);
@@ -310,7 +468,13 @@ bindForm('otherIncomeForm', 'otherIncomes', d => ({
   notes: d.notes || ''
 }));
 
-bindForm('expenseForm', 'expenses', d => ({ category: d.category, amount: Number(d.amount), date: d.date }));
+bindForm('expenseForm', 'expenses', d => ({ 
+  category: d.category, 
+  amount: Number(d.amount), 
+  date: d.date,
+  notes: d.notes || ''
+}));
+
 bindForm('emiForm', 'emis', d => ({ name: d.name, amount: Number(d.amount), dueDate: d.dueDate, paid: d.paid === 'on' }));
 
 // Salary Controls
@@ -332,6 +496,24 @@ document.getElementById('saveSalaryBtn').onclick = () => {
 document.getElementById('cancelSalaryBtn').onclick = () => {
   document.getElementById('editSalaryForm').style.display = 'none';
 };
+
+// Expense Search
+document.getElementById('expenseSearchInput')?.addEventListener('input', (e) => {
+  if (e.target.value.trim()) {
+    searchExpenses(e.target.value);
+  } else {
+    clearExpenseFilter();
+  }
+});
+
+// Expense Category Filter
+document.getElementById('expenseCategoryFilter')?.addEventListener('change', (e) => {
+  if (e.target.value) {
+    filterExpensesByCategory(e.target.value);
+  } else {
+    clearExpenseFilter();
+  }
+});
 
 // General Controls
 document.querySelectorAll('input[type=date]').forEach(input => { input.value = today(); });
