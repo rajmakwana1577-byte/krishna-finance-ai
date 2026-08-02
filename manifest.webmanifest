@@ -1,0 +1,12 @@
+{
+  "name": "Krishna Finance AI",
+  "short_name": "Krishna AI",
+  "description": "Personal mobile-first finance tracker with offline support.",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#141218",
+  "theme_color": "#6750a4",
+  "orientation": "portrait-primary",
+  "icons": [{"src":"assets/icons/icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]
+}
+
