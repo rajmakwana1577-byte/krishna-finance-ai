@@ -1,1 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#6750a4">
+  <meta name="description" content="Krishna Finance AI - personal finance Progressive Web App">
+  <title>Krishna Finance AI</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="assets/icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="assets/icons/icon.svg">
+  <link rel="stylesheet" href="styles/main.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="top-app-bar glass-card">
+      <div>
+        <p class="eyebrow">Personal finance PWA</p>
+        <h1>Krishna Finance AI</h1>
+      </div>
+      <button id="themeToggle" class="icon-button" aria-label="Toggle dark or light mode">☾</button>
+    </header>
 
+    <main>
+      <section id="dashboard" class="view active" aria-labelledby="dashboard-title">
+        <div class="hero glass-card">
+          <p class="eyebrow">Current balance</p>
+          <h2 id="currentBalance">₹0</h2>
+          <p id="balanceInsight">Enter data to see your live finance snapshot.</p>
+        </div>
+        <div class="metric-grid">
+          <article class="metric glass-card"><span>Total Income</span><strong id="totalIncome">₹0</strong></article>
+          <article class="metric glass-card"><span>Total Expenses</span><strong id="totalExpenses">₹0</strong></article>
+          <article class="metric glass-card"><span>Savings</span><strong id="savings">₹0</strong></article>
+          <article class="metric glass-card"><span>EMI Due</span><strong id="emiDue">₹0</strong></article>
+          <article class="metric glass-card"><span>Electricity Total</span><strong id="electricityTotal">₹0</strong></article>
+          <article class="metric glass-card"><span>Daily Electricity</span><strong id="dailyElectricityMetric">₹90</strong></article>
+        </div>
+        <section class="glass-card chart-card">
+          <div class="section-heading"><h3>Monthly Flow</h3><span id="chartMonth"></span></div>
+          <canvas id="financeChart" width="640" height="320" aria-label="Income and expense chart"></canvas>
+        </section>
+      </section>
+
+      <section id="income" class="view" aria-labelledby="income-title">
+        <div class="section-heading"><h2 id="income-title">Income</h2><button class="text-button" data-reset="income">Reset</button></div>
+        <form id="incomeForm" class="form-card glass-card">
+          <label>Source<input name="source" required placeholder="Salary, Freelance"></label>
+          <label>Amount<input name="amount" type="number" min="0" step="1" required placeholder="38000"></label>
+          <label>Date<input name="date" type="date" required></label>
+          <button class="primary-button" type="submit">Add Income</button>
+        </form>
+        <div id="incomeList" class="list"></div>
+      </section>
+
+      <section id="expenses" class="view" aria-labelledby="expenses-title">
+        <h2 id="expenses-title">Daily Expenses</h2>
+        <form id="expenseForm" class="form-card glass-card">
+          <label>Category<input name="category" required placeholder="Food, Travel, Shopping"></label>
+          <label>Amount<input name="amount" type="number" min="0" step="1" required></label>
+          <label>Date<input name="date" type="date" required></label>
+          <button class="primary-button" type="submit">Add Expense</button>
+        </form>
+        <div id="expenseList" class="list"></div>
+      </section>
+
+      <section id="emi" class="view" aria-labelledby="emi-title">
+        <h2 id="emi-title">EMI Manager</h2>
+        <form id="emiForm" class="form-card glass-card">
+          <label>Name<input name="name" required placeholder="Home, Bike, Card"></label>
+          <label>Amount<input name="amount" type="number" min="0" step="1" required></label>
+          <label>Due Date<input name="dueDate" type="date" required></label>
+          <label class="check-row"><input name="paid" type="checkbox"> Mark as paid</label>
+          <button class="primary-button" type="submit">Add EMI</button>
+        </form>
+        <div id="emiList" class="list"></div>
+      </section>
+
+      <section id="electricity" class="view" aria-labelledby="electricity-title">
+        <h2 id="electricity-title">Electricity Tracker</h2>
+        <form id="electricityForm" class="form-card glass-card">
+          <label>Daily Electricity Cost<input id="dailyElectricityInput" name="daily" type="number" min="0" step="1" required></label>
+          <label>Days This Month<input id="electricityDays" name="days" type="number" min="0" max="31" step="1" required></label>
+          <button class="primary-button" type="submit">Update Electricity</button>
+        </form>
+      </section>
+
+      <section id="summary" class="view" aria-labelledby="summary-title"><h2 id="summary-title">Monthly Summary</h2><div id="summaryCards" class="summary-grid"></div></section>
+      <section id="reports" class="view" aria-labelledby="reports-title"><h2 id="reports-title">Reports</h2><div class="glass-card"><canvas id="categoryChart" width="640" height="320"></canvas></div><div id="reportText" class="report-text"></div></section>
+      <section id="settings" class="view" aria-labelledby="settings-title"><h2 id="settings-title">Settings</h2><div class="form-card glass-card"><button id="exportData" class="primary-button">Export Data</button><button id="clearData" class="danger-button">Clear Local Data</button><textarea id="exportOutput" readonly placeholder="Exported JSON appears here"></textarea></div></section>
+    </main>
+
+    <nav class="bottom-nav" aria-label="Primary navigation">
+      <button data-view="dashboard" class="active">⌂<span>Dashboard</span></button>
+      <button data-view="income">＋<span>Income</span></button>
+      <button data-view="expenses">−<span>Expenses</span></button>
+      <button data-view="emi">◷<span>EMI</span></button>
+      <button data-view="electricity">⚡<span>Power</span></button>
+      <button data-view="summary">▦<span>Summary</span></button>
+      <button data-view="reports">◔<span>Reports</span></button>
+      <button data-view="settings">⚙<span>Settings</span></button>
+    </nav>
+  </div>
+  <script src="src/app.js" defer></script>
+</body>
+                                     </html>
+                                     
