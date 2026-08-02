@@ -411,7 +411,7 @@ function drawBars(canvasId, labels, values, colors) {
   const ctx = canvas.getContext('2d');
   const max = Math.max(...values, 1);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.font = '22px system-us';
+  ctx.font = '22px system-ui';
   ctx.textBaseline = 'middle';
   values.forEach((value, i) => {
     const x = 45 + i * (canvas.width - 90) / values.length;
