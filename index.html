@@ -43,14 +43,44 @@
       </section>
 
       <section id="income" class="view" aria-labelledby="income-title">
-        <div class="section-heading"><h2 id="income-title">Income</h2><button class="text-button" data-reset="income">Reset</button></div>
-        <form id="incomeForm" class="form-card glass-card">
-          <label>Source<input name="source" required placeholder="Salary, Freelance"></label>
-          <label>Amount<input name="amount" type="number" min="0" step="1" required placeholder="38000"></label>
+        <h2 id="income-title">Income</h2>
+        
+        <!-- Fixed Salary Section -->
+        <div class="section-heading"><h3>Fixed Salary</h3><span id="salaryMonthDisplay"></span></div>
+        <div class="income-card glass-card">
+          <div>
+            <strong>Salary Income</strong><br>
+            <small id="salaryDisplay">₹38,000</small>
+          </div>
+          <button id="editSalaryBtn" class="icon-button">✎</button>
+        </div>
+        <div id="editSalaryForm" class="form-card glass-card" style="display:none;">
+          <label>Monthly Salary<input id="salaryInput" type="number" min="0" step="1" value="38000"></label>
+          <button id="saveSalaryBtn" class="primary-button">Save</button>
+          <button id="cancelSalaryBtn" class="primary-button secondary">Cancel</button>
+        </div>
+
+        <!-- Business Income Section -->
+        <div class="section-heading"><h3>Business Income</h3><span id="businessMonthTotal">₹0</span></div>
+        <form id="businessIncomeForm" class="form-card glass-card">
+          <label>Description<input name="description" required placeholder="Project, Freelance, Consulting"></label>
+          <label>Amount<input name="amount" type="number" min="0" step="1" required placeholder="5000"></label>
           <label>Date<input name="date" type="date" required></label>
-          <button class="primary-button" type="submit">Add Income</button>
+          <label>Notes<textarea name="notes" placeholder="Optional notes about this income"></textarea></label>
+          <button class="primary-button" type="submit">Add Business Income</button>
         </form>
-        <div id="incomeList" class="list"></div>
+        <div id="businessIncomeList" class="list"></div>
+
+        <!-- Other Income Section -->
+        <div class="section-heading"><h3>Other Income</h3><span id="otherMonthTotal">₹0</span></div>
+        <form id="otherIncomeForm" class="form-card glass-card">
+          <label>Source<input name="source" required placeholder="Interest, Gifts, Refunds"></label>
+          <label>Amount<input name="amount" type="number" min="0" step="1" required placeholder="1000"></label>
+          <label>Date<input name="date" type="date" required></label>
+          <label>Notes<textarea name="notes" placeholder="Optional notes about this income"></textarea></label>
+          <button class="primary-button" type="submit">Add Other Income</button>
+        </form>
+        <div id="otherIncomeList" class="list"></div>
       </section>
 
       <section id="expenses" class="view" aria-labelledby="expenses-title">
@@ -86,8 +116,8 @@
       </section>
 
       <section id="summary" class="view" aria-labelledby="summary-title"><h2 id="summary-title">Monthly Summary</h2><div id="summaryCards" class="summary-grid"></div></section>
-      <section id="reports" class="view" aria-labelledby="reports-title"><h2 id="reports-title">Reports</h2><div class="glass-card"><canvas id="categoryChart" width="640" height="320"></canvas></div><div id="reportText" class="report-text"></div></section>
-      <section id="settings" class="view" aria-labelledby="settings-title"><h2 id="settings-title">Settings</h2><div class="form-card glass-card"><button id="exportData" class="primary-button">Export Data</button><button id="clearData" class="danger-button">Clear Local Data</button><textarea id="exportOutput" readonly placeholder="Exported JSON appears here"></textarea></div></section>
+      <section id="reports" class="view" aria-labelledby="reports-title"><h2 id="reports-title">Reports</h2><div class="glass-card"><canvas id="categoryChart" width="640" height="320"></canvas></div><div id="reportText" class="report-metrics"></div></section>
+      <section id="settings" class="view" aria-labelledby="settings-title"><h2 id="settings-title">Settings</h2><div class="form-card glass-card"><button id="exportData" class="primary-button">Export Data</button><textarea id="exportOutput" readonly></textarea><button id="clearData" class="primary-button danger">Clear All Data</button></div></section>
     </main>
 
     <nav class="bottom-nav" aria-label="Primary navigation">
@@ -103,5 +133,4 @@
   </div>
   <script src="src/app.js" defer></script>
 </body>
-                                     </html>
-                                     
+</html>
