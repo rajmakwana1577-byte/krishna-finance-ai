@@ -20,6 +20,15 @@ const EXPENSE_CATEGORIES = [
   'Other'
 ];
 
+const LOAN_TYPES = [
+  'Home',
+  'Car',
+  'Bike',
+  'Personal',
+  'Credit Card',
+  'Other'
+];
+
 const defaults = {
   theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light',
   salary: { amount: 38000 },
@@ -64,6 +73,20 @@ function migrateState(saved) {
       notes: expense.notes || ''
     }));
   }
+
+  // Migrate old EMI structure to new enhanced structure
+  if (parsed.emis && Array.isArray(parsed.emis)) {
+    parsed.emis = parsed.emis.map(emi => ({
+      ...emi,
+      loanType: emi.loanType || 'Personal',
+      totalAmount: emi.totalAmount || emi.amount || 0,
+      interestRate: emi.interestRate || 0,
+      startDate: emi.startDate || emi.dueDate || today(),
+      remainingBalance: emi.remainingBalance || emi.amount || 0,
+      paymentHistory: emi.paymentHistory || [],
+      notes: emi.notes || ''
+    }));
+  }
   
   // Ensure all new properties exist
   if (!parsed.salary) parsed.salary = structuredClone(defaults.salary);
@@ -97,6 +120,19 @@ function getCategoryWiseExpenses() {
   return categoryMap;
 }
 
+function getMonthlyEMIDue() {
+  const thisMonth = state.emis.filter(emi => monthKey(emi.dueDate) === monthKey() && !emi.paid);
+  return sum(thisMonth.map(e => ({ amount: e.amount })));
+}
+
+function getNextEMI() {
+  const today_date = new Date(today());
+  const upcoming = state.emis
+    .filter(emi => new Date(emi.dueDate) >= today_date && !emi.paid)
+    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))[0];
+  return upcoming || null;
+}
+
 function totals() {
   const salaryIncome = Number(state.salary?.amount || 0);
   const businessIncome = sum(byMonth(state.businessIncomes));
@@ -104,7 +140,7 @@ function totals() {
   const totalIncome = salaryIncome + businessIncome + otherIncome;
   
   const expenseTotal = sum(byMonth(state.expenses));
-  const emiDue = sum(state.emis.filter(emi => !emi.paid && monthKey(emi.dueDate) === monthKey()));
+  const emiDue = getMonthlyEMIDue();
   const power = electricityTotal();
   const totalExpenses = expenseTotal + emiDue + power;
   
@@ -156,7 +192,10 @@ function render() {
   renderExpenseList('expenseList', state.expenses);
   renderCategoryWiseTotals();
   
-  renderList('emiList', state.emis, item => `${item.name} ${item.paid ? '• Paid' : '• Due'}`, item => item.dueDate, 'emis', true);
+  // Render EMI Module
+  setText('emiMonthTotal', currency.format(t.emiDue));
+  renderEMIList('emiList', state.emis);
+  renderNextEMICard();
   
   renderSummary(t); 
   renderReports(t); 
@@ -351,24 +390,215 @@ function searchExpenses(query) {
   });
 }
 
-function renderList(id, items, title, subtitle, collection, canToggle = false) {
+// EMI Functions
+function renderNextEMICard() {
+  const nextEMI = getNextEMI();
+  const container = document.getElementById('nextEMICard');
+  if (!container) return;
+  
+  if (!nextEMI) {
+    container.innerHTML = '<article class="metric glass-card"><span>Next EMI Due</span><strong>None</strong></article>';
+    return;
+  }
+  
+  container.innerHTML = `
+    <article class="metric glass-card highlight">
+      <span>${nextEMI.name} (${nextEMI.loanType})</span>
+      <strong>${currency.format(nextEMI.amount)}</strong>
+      <small>Due: ${nextEMI.dueDate}</small>
+    </article>
+  `;
+}
+
+function renderEMIList(id, items, filterType = null) {
   const el = document.getElementById(id);
-  el.innerHTML = items.length ? '' : '<article class="list-item glass-card"><div>No entries yet</div></article>';
-  items.slice().reverse().forEach(item => {
+  let filtered = items;
+  
+  if (filterType) {
+    filtered = items.filter(item => item.loanType === filterType);
+  }
+  
+  el.innerHTML = filtered.length ? '' : '<article class="list-item glass-card"><div>No EMI entries yet</div></article>';
+  filtered.slice().reverse().forEach(item => {
     const row = document.createElement('article');
     row.className = 'list-item glass-card';
-    row.innerHTML = `<div><strong>${title(item)}</strong><br><small>${subtitle(item)} • ${currency.format(item.amount)}</small></div><div class="item-actions">${canToggle ? '<button class="chip" data-toggle>Mark Paid</button>' : ''}<button class="icon-button" data-delete>🗑</button></div>`;
+    const statusClass = item.paid ? 'paid' : 'unpaid';
+    const statusText = item.paid ? '✓ Paid' : '⏳ Due';
+    const noteText = item.notes ? `<br><small class="note">${item.notes}</small>` : '';
+    
+    row.innerHTML = `
+      <div class="emi-card-content">
+        <div>
+          <strong>${item.name}</strong><br>
+          <small class="emi-type">${item.loanType}</small><br>
+          <small>EMI: ${currency.format(item.amount)} | Balance: ${currency.format(item.remainingBalance)}</small><br>
+          <small>Due: ${item.dueDate} | Rate: ${item.interestRate}%</small>${noteText}
+        </div>
+        <div class="emi-status ${statusClass}">${statusText}</div>
+      </div>
+      <div class="item-actions">
+        <button class="icon-button" data-edit data-id="${item.id}">✎</button>
+        <button class="icon-button" data-history data-id="${item.id}">📋</button>
+        <button class="icon-button" data-delete data-id="${item.id}">🗑</button>
+      </div>
+    `;
+    
     row.querySelector('[data-delete]').onclick = () => { 
-      state[collection] = state[collection].filter(entry => entry.id !== item.id); 
+      state.emis = state.emis.filter(entry => entry.id !== item.id); 
       render(); 
     };
-    const toggle = row.querySelector('[data-toggle]'); 
-    if (toggle) toggle.onclick = () => { 
-      item.paid = !item.paid; 
-      render(); 
+    
+    row.querySelector('[data-edit]').onclick = () => {
+      openEditEMIForm(item);
     };
+    
+    row.querySelector('[data-history]').onclick = () => {
+      showPaymentHistory(item);
+    };
+    
     el.appendChild(row);
   });
+}
+
+function openEditEMIForm(item) {
+  const formEl = document.getElementById('emiForm');
+  
+  // Populate form with existing data
+  formEl.elements[0].value = item.name;
+  formEl.elements[1].value = item.loanType;
+  formEl.elements[2].value = item.totalAmount;
+  formEl.elements[3].value = item.amount;
+  formEl.elements[4].value = item.interestRate;
+  formEl.elements[5].value = item.startDate;
+  formEl.elements[6].value = item.dueDate;
+  formEl.elements[7].value = item.remainingBalance;
+  formEl.elements[8].value = item.notes || '';
+  
+  // Change button text and handler
+  const submitBtn = formEl.querySelector('button[type="submit"]');
+  const originalText = submitBtn.textContent;
+  const originalOnSubmit = formEl.onsubmit;
+  
+  submitBtn.textContent = 'Update EMI';
+  
+  formEl.onsubmit = (event) => {
+    event.preventDefault();
+    const data = Object.fromEntries(new FormData(formEl));
+    const index = state.emis.findIndex(e => e.id === item.id);
+    if (index >= 0) {
+      state.emis[index] = {
+        id: item.id,
+        name: data.name,
+        loanType: data.loanType,
+        totalAmount: Number(data.totalAmount),
+        amount: Number(data.amount),
+        interestRate: Number(data.interestRate),
+        startDate: data.startDate,
+        dueDate: data.dueDate,
+        remainingBalance: Number(data.remainingBalance),
+        paid: item.paid,
+        paymentHistory: item.paymentHistory,
+        notes: data.notes || ''
+      };
+    }
+    formEl.reset();
+    submitBtn.textContent = originalText;
+    formEl.onsubmit = originalOnSubmit;
+    render();
+  };
+}
+
+function showPaymentHistory(emi) {
+  const historyText = emi.paymentHistory.length > 0 
+    ? emi.paymentHistory.map((p, i) => `${i + 1}. ${p.date} - ${currency.format(p.amount)}`).join('\n')
+    : 'No payment history yet';
+  
+  alert(`Payment History - ${emi.name}:\n\n${historyText}`);
+}
+
+function markEMIPaid(emiId) {
+  const emiIndex = state.emis.findIndex(e => e.id === emiId);
+  if (emiIndex >= 0) {
+    const emi = state.emis[emiIndex];
+    if (!emi.paid) {
+      emi.paid = true;
+      emi.paymentHistory = emi.paymentHistory || [];
+      emi.paymentHistory.push({
+        date: today(),
+        amount: emi.amount
+      });
+    }
+    render();
+  }
+}
+
+function markEMIUnpaid(emiId) {
+  const emiIndex = state.emis.findIndex(e => e.id === emiId);
+  if (emiIndex >= 0) {
+    state.emis[emiIndex].paid = false;
+    render();
+  }
+}
+
+function searchEMIs(query) {
+  const el = document.getElementById('emiList');
+  const lowerQuery = query.toLowerCase();
+  const filtered = state.emis.filter(emi => 
+    emi.name.toLowerCase().includes(lowerQuery) || 
+    emi.loanType.toLowerCase().includes(lowerQuery) ||
+    (emi.notes && emi.notes.toLowerCase().includes(lowerQuery))
+  );
+  
+  el.innerHTML = filtered.length ? '' : '<article class="list-item glass-card"><div>No matching EMIs</div></article>';
+  filtered.slice().reverse().forEach(item => {
+    const row = document.createElement('article');
+    row.className = 'list-item glass-card';
+    const statusClass = item.paid ? 'paid' : 'unpaid';
+    const statusText = item.paid ? '✓ Paid' : '⏳ Due';
+    const noteText = item.notes ? `<br><small class="note">${item.notes}</small>` : '';
+    
+    row.innerHTML = `
+      <div class="emi-card-content">
+        <div>
+          <strong>${item.name}</strong><br>
+          <small class="emi-type">${item.loanType}</small><br>
+          <small>EMI: ${currency.format(item.amount)} | Balance: ${currency.format(item.remainingBalance)}</small><br>
+          <small>Due: ${item.dueDate} | Rate: ${item.interestRate}%</small>${noteText}
+        </div>
+        <div class="emi-status ${statusClass}">${statusText}</div>
+      </div>
+      <div class="item-actions">
+        <button class="icon-button" data-edit data-id="${item.id}">✎</button>
+        <button class="icon-button" data-history data-id="${item.id}">📋</button>
+        <button class="icon-button" data-delete data-id="${item.id}">🗑</button>
+      </div>
+    `;
+    
+    row.querySelector('[data-delete]').onclick = () => { 
+      state.emis = state.emis.filter(entry => entry.id !== item.id); 
+      render(); 
+    };
+    
+    row.querySelector('[data-edit]').onclick = () => {
+      openEditEMIForm(item);
+    };
+    
+    row.querySelector('[data-history]').onclick = () => {
+      showPaymentHistory(item);
+    };
+    
+    el.appendChild(row);
+  });
+}
+
+function clearEMIFilter() {
+  document.getElementById('emiLoanTypeFilter').value = '';
+  document.getElementById('emiSearchInput').value = '';
+  renderEMIList('emiList', state.emis);
+}
+
+function filterEMIsByLoanType(loanType) {
+  renderEMIList('emiList', state.emis, loanType);
 }
 
 function renderSummary(t) {
@@ -390,6 +620,8 @@ function renderReports(t) {
   const topCategory = largestCategory();
   const categoryMap = getCategoryWiseExpenses();
   const topCategoryAmount = categoryMap[topCategory] || 0;
+  const totalEMIAmount = sum(state.emis.map(e => ({ amount: e.amount })));
+  const totalRemainingBalance = sum(state.emis.map(e => ({ amount: e.remainingBalance })));
   
   document.getElementById('reportText').innerHTML = `
     <article class="metric glass-card"><span>Savings Rate</span><strong>${savingsRate}%</strong></article>
@@ -397,6 +629,8 @@ function renderReports(t) {
     <article class="metric glass-card"><span>Top Category Amount</span><strong>${currency.format(topCategoryAmount)}</strong></article>
     <article class="metric glass-card"><span>Monthly Salary</span><strong>${currency.format(t.salaryIncome)}</strong></article>
     <article class="metric glass-card"><span>Variable Income</span><strong>${currency.format(t.businessIncome + t.otherIncome)}</strong></article>
+    <article class="metric glass-card"><span>Total Monthly EMI</span><strong>${currency.format(totalEMIAmount)}</strong></article>
+    <article class="metric glass-card"><span>Total Remaining Balance</span><strong>${currency.format(totalRemainingBalance)}</strong></article>
   `;
 }
 
@@ -477,7 +711,19 @@ bindForm('expenseForm', 'expenses', d => ({
   notes: d.notes || ''
 }));
 
-bindForm('emiForm', 'emis', d => ({ name: d.name, amount: Number(d.amount), dueDate: d.dueDate, paid: d.paid === 'on' }));
+bindForm('emiForm', 'emis', d => ({ 
+  name: d.name, 
+  loanType: d.loanType,
+  totalAmount: Number(d.totalAmount),
+  amount: Number(d.amount), 
+  interestRate: Number(d.interestRate),
+  startDate: d.startDate,
+  dueDate: d.dueDate,
+  remainingBalance: Number(d.remainingBalance),
+  paid: false,
+  paymentHistory: [],
+  notes: d.notes || ''
+}));
 
 // Salary Controls
 document.getElementById('editSalaryBtn').onclick = () => {
@@ -519,6 +765,30 @@ if (expenseCategoryFilter) {
       filterExpensesByCategory(e.target.value);
     } else {
       clearExpenseFilter();
+    }
+  });
+}
+
+// EMI Search
+const emiSearchInput = document.getElementById('emiSearchInput');
+if (emiSearchInput) {
+  emiSearchInput.addEventListener('input', (e) => {
+    if (e.target.value.trim()) {
+      searchEMIs(e.target.value);
+    } else {
+      clearEMIFilter();
+    }
+  });
+}
+
+// EMI Loan Type Filter
+const emiLoanTypeFilter = document.getElementById('emiLoanTypeFilter');
+if (emiLoanTypeFilter) {
+  emiLoanTypeFilter.addEventListener('change', (e) => {
+    if (e.target.value) {
+      filterEMIsByLoanType(e.target.value);
+    } else {
+      clearEMIFilter();
     }
   });
 }
