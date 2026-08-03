@@ -1,4 +1,4 @@
-const STORAGE_KEY = 'krishnaFinanceAI:v1';
+const STORAGE_KEY = 'હોમબજેટ-AI:v1';
 const currency = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 });
 const today = () => new Date().toISOString().slice(0, 10);
 const monthKey = (date = today()) => date.slice(0, 7);
