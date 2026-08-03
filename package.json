@@ -1,7 +1,7 @@
 {
   "name": "હોમ-બજેટ-ai",
   "version": "1.0.0",
-  "description": "Premium mobile-first personal finance PWA",
+  "description": "Premium mobile-first પર્સનલ ફાઇનાન્સ PWA",
   "scripts": {
     "start": "python3 -m http.server 4173",
     "test": "node --check src/app.js"
